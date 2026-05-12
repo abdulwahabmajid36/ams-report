@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AMS Daily Erection Report Updater</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: #e2e0d8;
+    --border2: #d0cec4;
+    --text: #1a1916;
+    --text2: #6b6960;
+    --text3: #9b9990;
+    --blue: #1a6fc4;
+    --blue-bg: #e8f0fb;
+    --blue-text: #1a4a8a;
+    --green: #1a7a3c;
+    --green-bg: #e8f5ed;
+    --green-text: #0f5228;
+    --amber: #b85c00;
+    --amber-bg: #fef3e2;
+    --amber-text: #7a3c00;
+    --red: #c42020;
+    --red-bg: #fce8e8;
+    --red-text: #8a1010;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--text);
+    color: #fff;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  }
+  .header-logo {
+    width: 36px; height: 36px;
+    background: #fff;
+    border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .header h1 { font-size: 16px; font-weight: 600; letter-spacing: -0.2px; }
+  .header p { font-size: 12px; opacity: 0.6; margin-top: 1px; }
+  .api-badge {
+    margin-left: auto;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: rgba(255,255,255,0.8);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .api-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; }
+
+  /* MAIN */
+  .main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+
+  /* API KEY SECTION */
+  .api-section {
+    background: var(--amber-bg);
+    border: 1px solid #f0c060;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .api-section.hidden { display: none; }
+  .api-icon { font-size: 24px; flex-shrink: 0; }
+  .api-section h3 { font-size: 14px; font-weight: 600; color: var(--amber-text); margin-bottom: 4px; }
+  .api-section p { font-size: 12px; color: var(--amber-text); opacity: 0.8; margin-bottom: 10px; }
+  .api-input-row { display: flex; gap: 8px; }
+  .api-input-row input {
+    flex: 1; padding: 8px 12px;
+    border: 1px solid #f0c060;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    background: #fff;
+    font-family: monospace;
+    color: var(--text);
+  }
+  .api-input-row input:focus { outline: 2px solid var(--blue); border-color: transparent; }
+
+  /* STEPS */
+  .steps-nav {
+    display: flex;
+    gap: 0;
+    margin-bottom: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .step-nav-item {
+    flex: 1; padding: 12px 8px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text3);
+    cursor: pointer;
+    border-right: 1px solid var(--border);
+    transition: all 0.15s;
+    background: var(--surface2);
+    user-select: none;
+  }
+  .step-nav-item:last-child { border-right: none; }
+  .step-nav-item.active { background: var(--text); color: #fff; }
+  .step-nav-item.done { background: var(--green-bg); color: var(--green-text); }
+  .step-num { font-size: 16px; display: block; margin-bottom: 2px; }
+
+  /* CARD */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 13px; font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  /* DROP ZONES */
+  .drop-zone {
+    border: 2px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg);
+    margin-bottom: 12px;
+  }
+  .drop-zone:hover { border-color: var(--blue); background: var(--blue-bg); }
+  .drop-zone.done { border-color: var(--green); border-style: solid; background: var(--green-bg); }
+  .drop-zone.dragover { border-color: var(--blue); background: var(--blue-bg); transform: scale(1.01); }
+  .drop-icon { font-size: 32px; margin-bottom: 8px; }
+  .drop-zone h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .drop-zone p { font-size: 12px; color: var(--text2); }
+  .drop-zone.done h3 { color: var(--green-text); }
+  .drop-zone.done p { color: var(--green); }
+
+  /* SHEET SELECTOR */
+  .sheet-sel { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .sheet-btn {
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: var(--surface2);
+    color: var(--text2);
+    transition: all 0.15s;
+  }
+  .sheet-btn:hover { border-color: var(--blue); color: var(--blue); }
+  .sheet-btn.active { background: var(--text); color: #fff; border-color: var(--text); }
+
+  /* IMAGE PREVIEW */
+  #imgPreview {
+    max-width: 100%; max-height: 200px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    display: none;
+    margin-top: 12px;
+  }
+
+  /* STATUS */
+  .status {
+    padding: 10px 16px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: none;
+    line-height: 1.5;
+  }
+  .status.info { background: var(--blue-bg); color: var(--blue-text); display: block; }
+  .status.ok { background: var(--green-bg); color: var(--green-text); display: block; }
+  .status.err { background: var(--red-bg); color: var(--red-text); display: block; }
+
+  /* BUTTONS */
+  .btn {
+    padding: 10px 20px;
+    border-radius: var(--radius-sm);
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    color: var(--text);
+    transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: var(--surface2); }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+  .btn-primary {
+    background: var(--text); color: #fff;
+    border-color: transparent;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+  .btn-primary:hover { opacity: 0.88; background: var(--text); }
+  .btn-green { background: var(--green); color: #fff; border-color: transparent; }
+  .btn-green:hover { opacity: 0.88; background: var(--green); }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* ENTRY CARDS */
+  .entry-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .entry-header {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 12px;
+  }
+  .tag-badge {
+    background: var(--blue-bg); color: var(--blue-text);
+    border-radius: 20px; padding: 3px 12px;
+    font-size: 12px; font-weight: 700;
+  }
+  .entry-meta { font-size: 12px; color: var(--text2); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .fg { display: flex; flex-direction: column; gap: 4px; }
+  .fg label { font-size: 11px; color: var(--text2); font-weight: 500; }
+  .fg input {
+    width: 100%; padding: 7px 10px;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    background: var(--surface);
+    color: var(--text);
+    transition: border-color 0.15s;
+  }
+  .fg input:focus { outline: none; border-color: var(--blue); }
+
+  /* NOTE BOX */
+  .note-box {
+    background: var(--amber-bg);
+    border: 1px solid #f0c060;
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--amber-text);
+    margin-top: 10px;
+  }
+
+  /* SUMMARY */
+  .summary-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+  }
+  .summary-row:last-child { border: none; }
+  .summary-label { color: var(--text2); }
+  .summary-val { font-weight: 600; }
+  .vol-green { color: var(--green); }
+
+  /* SUCCESS BANNER */
+  .success-banner {
+    background: var(--green-bg);
+    border: 1px solid #90dba8;
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .success-banner .icon { font-size: 40px; margin-bottom: 8px; }
+  .success-banner h2 { font-size: 18px; color: var(--green-text); margin-bottom: 4px; }
+  .success-banner p { font-size: 13px; color: var(--green); }
+
+  /* LOADING SPINNER */
+  .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    vertical-align: -3px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* FOOTER */
+  .footer {
+    text-align: center;
+    padding: 20px;
+    font-size: 12px;
+    color: var(--text3);
+    border-top: 1px solid var(--border);
+    margin-top: 20px;
+  }
+
+  /* STEP PAGES */
+  .step-page { display: none; }
+  .step-page.active { display: block; }
+
+  @media (max-width: 500px) {
+    .grid2, .grid3 { grid-template-columns: 1fr; }
+    .header h1 { font-size: 14px; }
+    .api-badge span { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">📋</div>
+  <div>
+    <h1>AMS Daily Erection Report</h1>
+    <p>Auto-Updater — Plant 1</p>
+  </div>
+  <div class="api-badge">
+    <div class="api-dot" id="apiDot" style="background:#f87171;"></div>
+    <span id="apiStatus">API Key Required</span>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- API KEY -->
+  <div class="api-section" id="apiSection">
+    <div class="api-icon">🔑</div>
+    <div style="flex:1;">
+      <h3>Anthropic API Key darain</h3>
+      <p>Image read karne ke liye Claude AI use hota hai. Key sirf aapke browser mein save hoti hai, kahin send nahi hoti.</p>
+      <div class="api-input-row">
+        <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-..." />
+        <button class="btn btn-primary" onclick="saveApiKey()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEPS NAV -->
+  <div class="steps-nav">
+    <div class="step-nav-item active" id="nav0" onclick="goStep(0)">
+      <span class="step-num">📁</span>Upload
+    </div>
+    <div class="step-nav-item" id="nav1">
+      <span class="step-num">🔍</span>Review
+    </div>
+    <div class="step-nav-item" id="nav2">
+      <span class="step-num">✅</span>Download
+    </div>
+  </div>
+
+  <!-- STEP 1: UPLOAD -->
+  <div class="step-page active" id="page0">
+
+    <!-- Excel Upload -->
+    <div class="card">
+      <div class="card-title">📊 Step 1 — Excel File Upload Karein</div>
+      <div class="drop-zone" id="xlsxZone"
+        ondragover="handleDragOver(event,'xlsxZone')"
+        ondragleave="handleDragLeave(event,'xlsxZone')"
+        ondrop="handleDrop(event,'xlsx')"
+        onclick="document.getElementById('xlsxInput').click()">
+        <div class="drop-icon" id="xlsxIcon">📂</div>
+        <h3 id="xlsxTitle">AMS_Daily_Erection_Report.xlsx</h3>
+        <p id="xlsxSub">Yahan click karein ya file drag karein</p>
+      </div>
+      <input type="file" id="xlsxInput" accept=".xlsx" onchange="handleXlsx(this.files[0])">
+
+      <div id="sheetWrap" style="display:none;">
+        <div class="card-title" style="margin-bottom:8px;">Konsi sheet mein data add karna hai?</div>
+        <div class="sheet-sel" id="sheetSel"></div>
+      </div>
+    </div>
+
+    <!-- Image Upload -->
+    <div class="card">
+      <div class="card-title">📷 Step 2 — Handwritten Sheet Ki Photo</div>
+      <div class="drop-zone" id="imgZone"
+        ondragover="handleDragOver(event,'imgZone')"
+        ondragleave="handleDragLeave(event,'imgZone')"
+        ondrop="handleDrop(event,'img')"
+        onclick="document.getElementById('imgInput').click()">
+        <div class="drop-icon" id="imgIconEl">📸</div>
+        <h3 id="imgTitle">Site Se Aai Report Ki Photo</h3>
+        <p id="imgSub">JPG ya PNG — saaf photo best results deti hai</p>
+      </div>
+      <input type="file" id="imgInput" accept="image/*" onchange="handleImg(this.files[0])">
+      <img id="imgPreview" alt="Uploaded report preview">
+    </div>
+
+    <div id="s1Status" class="status"></div>
+
+    <div class="actions">
+      <button class="btn btn-primary" id="extractBtn" disabled onclick="extractData()">
+        ✨ AI Se Data Extract Karein
+      </button>
+    </div>
+  </div>
+
+  <!-- STEP 2: REVIEW -->
+  <div class="step-page" id="page1">
+    <div id="s2Status" class="status"></div>
+    <div class="card">
+      <div class="card-title">✏️ Data Check Karein — Galat Ho Toh Edit Karein</div>
+      <div id="entriesList"></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="addToExcel()">📥 Excel Mein Add Karein</button>
+      <button class="btn" onclick="goStep(0)">← Wapas</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: DOWNLOAD -->
+  <div class="step-page" id="page2">
+    <div class="success-banner">
+      <div class="icon">🎉</div>
+      <h2>Data Successfully Add Ho Gaya!</h2>
+      <p>Aapki Excel file update ho gayi hai — neeche download karein</p>
+    </div>
+    <div class="card">
+      <div class="card-title">📋 Summary</div>
+      <div id="summaryContent"></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-green" onclick="downloadFile()">⬇️ Updated Excel Download Karein</button>
+      <button class="btn" onclick="resetAll()">🔄 Nayi Sheet Process Karein</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  AMS Daily Erection Report Updater &bull; Plant 1 &bull; PO 3052601161
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────
+let apiKey = localStorage.getItem('ams_api_key') || '';
+let xlsxBinary = null, xlsxFileName = '', selectedSheet = 'May 26';
+let imgBase64 = null, imgType = 'image/jpeg', imgFileName = '';
+let extractedData = null, updatedWB = null;
+
+// ─── API KEY ─────────────────────────────────────────────
+function saveApiKey() {
+  apiKey = document.getElementById("apiKeyInput").value;
+  localStorage.setItem("ams_api_key", apiKey);
+  document.getElementById("apiSection").classList.add("hidden");
+  document.getElementById("apiDot").style.background = "#4ade80";
+  document.getElementById("apiStatus").textContent = "API Connected";
+}
+
+// On load check
+window.onload = () => {
+  if (apiKey && apiKey.length > 5) {
+    document.getElementById('apiSection').classList.add('hidden');
+    document.getElementById('apiDot').style.background = '#4ade80';
+    document.getElementById('apiStatus').textContent = 'API Connected';
+    document.getElementById('apiKeyInput').value = apiKey;
+  }
+};
+
+// ─── STEPS ───────────────────────────────────────────────
+function goStep(n) {
+  document.querySelectorAll('.step-page').forEach((p, i) => p.classList.toggle('active', i === n));
+  document.querySelectorAll('.step-nav-item').forEach((nav, i) => {
+    nav.classList.remove('active', 'done');
+    if (i === n) nav.classList.add('active');
+    else if (i < n) nav.classList.add('done');
+  });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ─── DRAG & DROP ─────────────────────────────────────────
+function handleDragOver(e, id) { e.preventDefault(); document.getElementById(id).classList.add('dragover'); }
+function handleDragLeave(e, id) { document.getElementById(id).classList.remove('dragover'); }
+function handleDrop(e, type) {
+  e.preventDefault();
+  const id = type === 'xlsx' ? 'xlsxZone' : 'imgZone';
+  document.getElementById(id).classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  if (type === 'xlsx') handleXlsx(file);
+  else handleImg(file);
+}
+
+// ─── EXCEL UPLOAD ─────────────────────────────────────────
+function handleXlsx(file) {
+  if (!file) return;
+  xlsxFileName = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    xlsxBinary = e.target.result;
+    const wb = XLSX.read(xlsxBinary, { type: 'binary' });
+    const sheets = wb.SheetNames.filter(s => s !== 'Summary');
+
+    document.getElementById('xlsxIcon').textContent = '✅';
+    document.getElementById('xlsxTitle').textContent = file.name;
+    document.getElementById('xlsxSub').textContent = sheets.length + ' sheets mili: ' + sheets.join(', ');
+    document.getElementById('xlsxZone').classList.add('done');
+
+    const sel = document.getElementById('sheetSel');
+    sel.innerHTML = '';
+    // Auto-select current month sheet
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const curMonth = monthNames[new Date().getMonth()];
+    sheets.forEach(s => {
+      const btn = document.createElement('button');
+      btn.className = 'sheet-btn' + (s.startsWith(curMonth) ? ' active' : '');
+      if (s.startsWith(curMonth)) selectedSheet = s;
+      btn.textContent = s;
+      btn.onclick = () => {
+        selectedSheet = s;
+        document.querySelectorAll('.sheet-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      };
+      sel.appendChild(btn);
+    });
+    document.getElementById('sheetWrap').style.display = 'block';
+    checkReady();
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ─── IMAGE UPLOAD ─────────────────────────────────────────
+function handleImg(file) {
+  if (!file) return;
+  imgFileName = file.name;
+  imgType = file.type || 'image/jpeg';
+  const reader = new FileReader();
+  reader.onload = e => {
+    imgBase64 = e.target.result.split(',')[1];
+    const preview = document.getElementById('imgPreview');
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    document.getElementById('imgIconEl').textContent = '✅';
+    document.getElementById('imgTitle').textContent = file.name;
+    document.getElementById('imgSub').textContent = 'Image ready — AI parh lega';
+    document.getElementById('imgZone').classList.add('done');
+    checkReady();
+  };
+  reader.readAsDataURL(file);
+}
+
+function checkReady() {
+  document.getElementById('extractBtn').disabled = !(xlsxBinary && imgBase64);
+}
+
+function setStatus(id, msg, type) {
+  const el = document.getElementById(id);
+  el.innerHTML = msg;
+  el.className = 'status ' + type;
+}
+
+// ─── AI EXTRACT ───────────────────────────────────────────
+async function extractData() {
+  if (!apiKey) { alert('Pehle API key darain upar'); return; }
+
+  setStatus('s1Status', '<span class="spinner"></span> AI image parh raha hai — thoda intezaar karein...', 'info');
+  document.getElementById('extractBtn').disabled = true;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-calls': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: imgType, data: imgBase64 } },
+            { type: 'text', text: `Extract ALL data rows from this handwritten Daily Erection Report. Return ONLY valid JSON — no markdown, no explanation, nothing else.
+
+{
+  "entries": [
+    {
+      "tag_no": "235",
+      "erection_date": "06/05/2026",
+      "dismantled_date": "",
+      "work_description": "G Stn WHRB 31",
+      "user_requested_date": "06/05/2026",
+      "type_of_scaffolding": "Tower",
+      "start_time": "07:00",
+      "end_time": "16:00",
+      "no_of_scaffolders": "14",
+      "volume_lwh": "10x2.5x5",
+      "support_inspection": "",
+      "third_party_inspection": "",
+      "remarks": "Completed"
+    }
+  ],
+  "notes": "any notes written below the table, or empty string"
+}
+
+Rules:
+- dismantled_date: empty string if not given or written as "No"
+- start_time and end_time in 24hr HH:MM format
+- volume_lwh: write exactly as shown e.g. 10x2.5x5
+- Extract every row you can see
+- Return ONLY the JSON object` }
+          ]
+        }]
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.error?.message || 'API Error ' + resp.status);
+    }
+
+    const data = await resp.json();
+    const txt = data.content.map(i => i.text || '').join('');
+    const clean = txt.replace(/```json|```/g, '').trim();
+    extractedData = JSON.parse(clean);
+
+    renderEntries();
+    goStep(1);
+    setStatus('s2Status', '✅ ' + extractedData.entries.length + ' entries mili! Neeche check karein — galat ho toh edit karein, phir "Excel Mein Add Karein" dabayein.', 'ok');
+
+  } catch (err) {
+    setStatus('s1Status', '❌ Error: ' + err.message + (err.message.includes('401') ? ' — API key check karein' : ''), 'err');
+    document.getElementById('extractBtn').disabled = false;
+  }
+}
+
+// ─── RENDER ENTRIES ───────────────────────────────────────
+function renderEntries() {
+  const el = document.getElementById('entriesList');
+  el.innerHTML = '';
+
+  extractedData.entries.forEach((e, i) => {
+    const card = document.createElement('div');
+    card.className = 'entry-card';
+    const volParts = e.volume_lwh.replace(/\s/g,'').split('x');
+    const vol = volParts.length === 3 && volParts.every(v => !isNaN(parseFloat(v)))
+      ? (parseFloat(volParts[0]) * parseFloat(volParts[1]) * parseFloat(volParts[2])).toFixed(2)
+      : '—';
+    card.innerHTML = `
+      <div class="entry-header">
+        <span class="tag-badge">Tag ${e.tag_no}</span>
+        <span class="entry-meta">${e.erection_date} &bull; ${e.type_of_scaffolding} &bull; <strong style="color:var(--green)">${vol} m³</strong></span>
+      </div>
+      <div class="grid2">
+        <div class="fg"><label>Work Description</label>
+          <input value="${e.work_description}" oninput="extractedData.entries[${i}].work_description=this.value"></div>
+        <div class="fg"><label>User Requested Date</label>
+          <input value="${e.user_requested_date}" oninput="extractedData.entries[${i}].user_requested_date=this.value"></div>
+      </div>
+      <div class="grid3">
+        <div class="fg"><label>Erection Date</label>
+          <input value="${e.erection_date}" oninput="extractedData.entries[${i}].erection_date=this.value"></div>
+        <div class="fg"><label>Dismantled Date (khali = nahi)</label>
+          <input value="${e.dismantled_date}" placeholder="khali chodein" oninput="extractedData.entries[${i}].dismantled_date=this.value"></div>
+        <div class="fg"><label>Type of Scaffolding</label>
+          <input value="${e.type_of_scaffolding}" oninput="extractedData.entries[${i}].type_of_scaffolding=this.value"></div>
+      </div>
+      <div class="grid3">
+        <div class="fg"><label>Start Time (HH:MM)</label>
+          <input value="${e.start_time}" oninput="extractedData.entries[${i}].start_time=this.value"></div>
+        <div class="fg"><label>End Time</label>
+          <input value="${e.end_time}" oninput="extractedData.entries[${i}].end_time=this.value"></div>
+        <div class="fg"><label>No. of Scaffolders</label>
+          <input value="${e.no_of_scaffolders}" oninput="extractedData.entries[${i}].no_of_scaffolders=this.value"></div>
+      </div>
+      <div class="grid2">
+        <div class="fg"><label>Volume (L x W x H)</label>
+          <input value="${e.volume_lwh}" oninput="extractedData.entries[${i}].volume_lwh=this.value;this.closest('.entry-card').querySelector('.entry-meta strong').textContent=calcVol(this.value)+' m³'"></div>
+        <div class="fg"><label>Remarks</label>
+          <input value="${e.remarks}" oninput="extractedData.entries[${i}].remarks=this.value"></div>
+      </div>`;
+    el.appendChild(card);
+  });
+
+  if (extractedData.notes) {
+    const n = document.createElement('div');
+    n.className = 'note-box';
+    n.innerHTML = '📝 <strong>Note:</strong> ' + extractedData.notes;
+    el.appendChild(n);
+  }
+}
+
+function calcVol(lwh) {
+  const p = lwh.replace(/\s/g,'').split('x');
+  if (p.length === 3 && p.every(v => !isNaN(parseFloat(v))))
+    return (parseFloat(p[0]) * parseFloat(p[1]) * parseFloat(p[2])).toFixed(2);
+  return '—';
+}
+
+// ─── ADD TO EXCEL ─────────────────────────────────────────
+function addToExcel() {
+  const wb = XLSX.read(xlsxBinary, { type: 'binary', cellStyles: true, cellDates: true });
+  const ws = wb.Sheets[selectedSheet];
+
+  if (!ws) { alert(selectedSheet + ' sheet nahi mili!'); return; }
+
+  const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:O30');
+  let lastDataRow = 2;
+  for (let r = range.e.r; r >= 2; r--) {
+    const cell = ws[XLSX.utils.encode_cell({ r, c: 0 })];
+    if (cell && cell.v !== undefined && cell.v !== null && cell.v !== '') { lastDataRow = r; break; }
+  }
+
+  let insertRow = lastDataRow + 1;
+
+  extractedData.entries.forEach((e, idx) => {
+    const r = insertRow + idx;
+    const rowNum = r + 1;
+
+    function sc(col, val, fmt, type) {
+      const addr = XLSX.utils.encode_cell({ r, c: col });
+      ws[addr] = { v: val, t: type || (typeof val === 'number' ? 'n' : 's') };
+      if (fmt) ws[addr].z = fmt;
+    }
+
+    function scDate(col, dateStr) {
+      const addr = XLSX.utils.encode_cell({ r, c: col });
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+        ws[addr] = { v: d, t: 'd', z: 'dd/mm/yyyy' };
+      } else {
+        ws[addr] = { v: dateStr, t: 's' };
+      }
+    }
+
+    function scTime(col, timeStr) {
+      const addr = XLSX.utils.encode_cell({ r, c: col });
+      const [h, m] = (timeStr || '07:00').split(':');
+      const d = new Date(2000, 0, 1, parseInt(h) || 7, parseInt(m) || 0);
+      ws[addr] = { v: d, t: 'd', z: 'h:mm AM/PM' };
+    }
+
+    sc(0, e.tag_no);
+    scDate(1, e.erection_date);
+    if (e.dismantled_date) scDate(2, e.dismantled_date);
+    sc(3, e.work_description);
+    sc(4, e.user_requested_date || e.erection_date);
+    sc(5, e.type_of_scaffolding || 'Tower');
+    scTime(6, e.start_time);
+    sc(7, e.end_time || '06.00 PM');
+    sc(8, e.no_of_scaffolders);
+    sc(9, e.volume_lwh);
+
+    // Volume formula
+    const p = e.volume_lwh.replace(/\s/g,'').split('x');
+    const volF = (p.length === 3 && p.every(v => !isNaN(parseFloat(v))))
+      ? p[0] + '*' + p[1] + '*' + p[2]
+      : e.volume_lwh;
+    const numFmt = '_(* #,##0.00_);_(* \\(#,##0.00\\);_(* "-"??_);_(@_)';
+    ws[XLSX.utils.encode_cell({ r, c: 10 })] = { f: volF, t: 'n', z: numFmt };
+    ws[XLSX.utils.encode_cell({ r, c: 11 })] = { f: `IF(C${rowNum}>0,K${rowNum},0)`, t: 'n', z: numFmt };
+
+    sc(12, e.support_inspection || '');
+    sc(13, e.third_party_inspection || '');
+    sc(14, e.remarks || 'Completed');
+  });
+
+  // Update range
+  ws['!ref'] = XLSX.utils.encode_range({
+    s: { r: 0, c: 0 },
+    e: { r: insertRow + extractedData.entries.length, c: range.e.c }
+  });
+
+  updatedWB = wb;
+
+  // Summary
+  const totalVol = extractedData.entries.reduce((sum, e) => {
+    const p = e.volume_lwh.replace(/\s/g,'').split('x');
+    if (p.length === 3 && p.every(v => !isNaN(parseFloat(v))))
+      return sum + parseFloat(p[0]) * parseFloat(p[1]) * parseFloat(p[2]);
+    return sum;
+  }, 0);
+
+  document.getElementById('summaryContent').innerHTML = `
+    <div class="summary-row"><span class="summary-label">Excel File</span><span class="summary-val">${xlsxFileName}</span></div>
+    <div class="summary-row"><span class="summary-label">Sheet</span><span class="summary-val">${selectedSheet}</span></div>
+    <div class="summary-row"><span class="summary-label">Entries Added</span><span class="summary-val">${extractedData.entries.length}</span></div>
+    <div class="summary-row"><span class="summary-label">Tags</span><span class="summary-val">${extractedData.entries.map(e => 'Tag ' + e.tag_no).join(', ')}</span></div>
+    <div class="summary-row"><span class="summary-label">Total Volume Erected</span><span class="summary-val vol-green">${totalVol.toFixed(2)} m³</span></div>
+    ${extractedData.notes ? `<div class="note-box" style="margin-top:12px;">📝 ${extractedData.notes}</div>` : ''}
+  `;
+
+  goStep(2);
+}
+
+// ─── DOWNLOAD ─────────────────────────────────────────────
+function downloadFile() {
+  if (!updatedWB) return;
+  const fname = xlsxFileName.replace('.xlsx', '') + '_updated.xlsx';
+  XLSX.writeFile(updatedWB, fname);
+}
+
+// ─── RESET ────────────────────────────────────────────────
+function resetAll() {
+  xlsxBinary = null; xlsxFileName = ''; imgBase64 = null;
+  extractedData = null; updatedWB = null;
+  document.getElementById('xlsxZone').classList.remove('done');
+  document.getElementById('imgZone').classList.remove('done');
+  document.getElementById('xlsxIcon').textContent = '📂';
+  document.getElementById('imgIconEl').textContent = '📸';
+  document.getElementById('xlsxTitle').textContent = 'AMS_Daily_Erection_Report.xlsx';
+  document.getElementById('xlsxSub').textContent = 'Yahan click karein ya file drag karein';
+  document.getElementById('imgTitle').textContent = 'Site Se Aai Report Ki Photo';
+  document.getElementById('imgSub').textContent = 'JPG ya PNG — saaf photo best results deti hai';
+  document.getElementById('imgPreview').style.display = 'none';
+  document.getElementById('sheetWrap').style.display = 'none';
+  document.getElementById('extractBtn').disabled = true;
+  document.getElementById('s1Status').className = 'status';
+  document.getElementById('xlsxInput').value = '';
+  document.getElementById('imgInput').value = '';
+  goStep(0);
+}
+</script>
+</body>
+</html>
